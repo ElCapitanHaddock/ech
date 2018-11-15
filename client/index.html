@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="en" ng-app>
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta content="text/html; charset=UTF-8; X-Content-Type-Options=nosniff" http-equiv="Content-Type" />
+    <meta name="author" content="Jeremy Yang">
+    <meta charset="UTF-8" />
+    <meta http-equiv="Cache-Control" content="public, max-age=30000">
+    <meta http-equiv="expires" content="Fri, 21 June 2050 14:25:27 GMT" />
+    <title>ech.io</title>
+  </head>
+  <body>
+  
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/sweetalert2/2.2.0/sweetalert2.min.css">
+    <link rel="stylesheet" type="text/css" href="indexstyle.css">
+    <script src="https://cdn.jsdelivr.net/sweetalert2/2.2.0/sweetalert2.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <div id='main'>
+      <p id='minititle'>echio</p>
+      <div id='chat'>
+        <div id='messages' tabindex="0"></div>
+        <div id='msgControls'>
+          <button onclick='boldText()' id='bold' class='controlButtons'><b>b</b></button>
+          <button onclick='italicizeText()' id='italic' class='controlButtons'><i>i</i></button>
+          <button onclick='underlineText()' id='underline' class='controlButtons'><u>u</u></button>
+          <button onclick='strikeText()' id='strike' class='controlButtons'><strike>str</strike></button>
+          <button onclick='insertLink()' id='url' class='controlButtons'>url</button>
+          <button onclick='insertImage()' id='image' class='controlButtons'>img</button>
+        </div>
+        <div class='msgbox'>
+          <input id='msgtext'></input>
+          <button id='msgbutton' onclick="submitMsg()"></button>
+        </div>
+      </div>
+      <div id='sidebar'>
+        <div id='roomName'>room1</div>
+        <select id='sidebar-options' onchange='changeSidebar()'>
+          <option class='sidebar-option' value='users'>Users</option>
+          <option class='sidebar-option' value='rooms'>Rooms</option>
+        </select>
+        <div style='height:12px'></div>
+        <button onclick='createClick()' id='createbutton'>Create Room</button>
+        <div id='userlist'></div>
+        <div id='roomlist'></div>
+      </div>
+    </div>
+    
+    
+<script type="text/javascript" charset="utf-8">
+
+$("#main").toggle();
+$("#main").stop(true, true).fadeIn({ duration: 750, queue: false }).css('display', 'none').slideDown(200);
+
+var rooms = [];
+var users = [];
+
+var ml = document.getElementById('messages');
+var msgtext = document.getElementById('msgtext');
+var ul = document.getElementById('userlist');
+var rl = document.getElementById('roomlist');
+var sboption = document.getElementById('sidebar-options');
+var createbutton = document.getElementById('createbutton');
+var roomtitle = document.getElementById('roomName');
+
+function changeSidebar(to) {
+  var to = sboption.value;
+  if (to == 'users') {
+    send('getUsers', "");
+  }
+  else if (to == 'rooms') {
+    send('getRooms', "");
+  }
+}
+
+function boldText() {
+  var len = msgtext.value.length;
+  var start = msgtext.selectionStart;
+  var end = msgtext.selectionEnd;
+  var sel = msgtext.value.substring(start, end);
+  var replace = '<b>' + sel + '</b>';
+  msgtext.value =  msgtext.value.substring(0,start) + replace + msgtext.value.substring(end,len);
+}
+
+function italicizeText() {
+  var len = msgtext.value.length;
+  var start = msgtext.selectionStart;
+  var end = msgtext.selectionEnd;
+  var sel = msgtext.value.substring(start, end);
+  var replace = '<i>' + sel + '</i>';
+  msgtext.value =  msgtext.value.substring(0,start) + replace + msgtext.value.substring(end,len);
+}
+
+function underlineText() {
+  var len = msgtext.value.length;
+  var start = msgtext.selectionStart;
+  var end = msgtext.selectionEnd;
+  var sel = msgtext.value.substring(start, end);
+  var replace = '<u>' + sel + '</u>';
+  msgtext.value =  msgtext.value.substring(0,start) + replace + msgtext.value.substring(end,len);
+}
+
+function strikeText() {
+  var len = msgtext.value.length;
+  var start = msgtext.selectionStart;
+  var end = msgtext.selectionEnd;
+  var sel = msgtext.value.substring(start, end);
+  var replace = '<strike>' + sel + '</strike>';
+  msgtext.value =  msgtext.value.substring(0,start) + replace + msgtext.value.substring(end,len);
+}
+
+function insertLink() {
+  var len = msgtext.value.length;
+  var start = msgtext.selectionStart;
+  var end = msgtext.selectionEnd;
+  var sel = msgtext.value.substring(start, end);
+  swal({   allowOutsideClick: false,
+    title: "<i>Insert Link</i>",   
+    text: "Put your url here.",   
+    input: 'text', 
+    cancelButtonText: 'Back',
+    showCancelButton: true,
+    closeOnConfirm: false,
+    inputPlaceholder: "",
+    inputAttributes: {
+      'autocapitalize': 'off',
+      'autocorrect': 'off'
+    },
+    inputValue: ''
+  }).then(function(inputValue) {
+    if (inputValue) {
+      if (sel.replace(/ /g).length == 0) {
+        sel = inputValue;
+      }
+      insert = "<a class='userLink' target='_blank' href='" + inputValue + "'>" + sel + "</a>";
+      msgtext.value =  msgtext.value.substring(0,start) + insert + msgtext.value.substring(end,len);
+    }
+    else {
+      
+    }
+  });
+}
+
+function insertImage() {
+  var len = msgtext.value.length;
+  var start = msgtext.selectionStart;
+  var end = msgtext.selectionEnd;
+  var sel = msgtext.value.substring(start, end);
+  var html = '';
+  if (start !== end) {
+    html = "<div style='height:12px'></div>" +
+    "<i>Link</i>" +
+    "<div style='height:10px'></div>" +
+    "<input type='text' class='swalInput' value = '" + sel  + "'id='imageLink'></input>" +
+    "<br></br>" +
+    "<i>Width</i>" +
+    "<div style='height:10px'></div>" +
+    "<input type='text' class='swalInput' id='imageWidth'></input>" +
+    "<br></br>" +
+    "<i>Height</i>" +
+    "<div style='height:10px'></div>" +
+    "<input type='text' class='swalInput' id='imageHeight'></input>";
+  }
+  else {
+    html = "<div style='height:12px'></div>" +
+    "<i>Link</i>" +
+    "<div style='height:10px'></div>" +
+    "<input type='text' class='swalInput' id='imageLink'></input>" +
+    "<br></br>" +
+    "<i>Width</i>" +
+    "<div style='height:10px'></div>" +
+    "<input type='text' class='swalInput' id='imageWidth'></input>" +
+    "<br></br>" +
+    "<i>Height</i>" +
+    "<div style='height:10px'></div>" +
+    "<input type='text' class='swalInput' id='imageHeight'></input>";
+  }
+  swal({
+    allowOutsideClick: false,
+    showCancelButton: true,
+    title: '<i>Insert Image</i>',
+    html: html
+  }).then(function(confirm) {
+    if (confirm) {
+      var link = document.getElementById('imageLink').value;
+      var width = document.getElementById('imageWidth').value;
+      var height = document.getElementById('imageHeight').value;
+      var insert = '';
+      width.replace(/[^0-9]+/g, "");
+      height.replace(/[^0-9]+/g, "");
+      if (width.replace(/ /g, '').length == 0) {
+        width = 'auto';
+      }
+      else {
+        width += 'px';
+      }
+      if (height.replace(/ /g, '').length == 0) {
+        height = 'auto'
+      }
+      else {
+        height += 'px';
+      }
+      insert = "<img class='userImage' style='width:" + width + ";height:" + height + "' src='" + link + "'></img>";
+      insertAtCaret(msgtext, insert);
+    }
+  });
+}
+
+function insertAtCaret(element, text) {
+    if (document.selection) {
+        element.focus();
+        var sel = document.selection.createRange();
+        sel.text = text;
+        element.focus();
+    } else if (element.selectionStart || element.selectionStart === 0) {
+        var startPos = element.selectionStart;
+        var endPos = element.selectionEnd;
+        var scrollTop = element.scrollTop;
+        element.value = element.value.substring(0, startPos) + text + element.value.substring(endPos, element.value.length);
+        element.focus();
+        element.selectionStart = startPos + text.length;
+        element.selectionEnd = startPos + text.length;
+        element.scrollTop = scrollTop;
+    } else {
+        element.value += text;
+        element.focus();
+    }
+}
+
+document.addEventListener("keydown", docKey, false);
+
+function docKey(e) {
+  var keyCode = e.keyCode;
+  if (keyCode == 13) {
+    var ae = document.activeElement;
+    if (ae.className !== 'swalInput' && ae.className !== 'swal2-input') {
+      if (ae.id !== 'msgtext') {
+        e.preventDefault();
+        $('#msgtext').focus();
+      }
+      else {
+        submitMsg();
+      }
+    }
+    var swalConfirms = ['loginName', 'loginPass', 'createName', 'createPass', 'imageLink', 'imageHeight', 'imageWidth'];
+    if (ae.className == 'swalInput' || ae.className == 'swal2-input') {
+      swal.clickConfirm();
+    }
+  }
+}
+
+$('#msgtext').keydown(function (e) {
+  if (e.ctrlKey && e.keyCode == 13) {
+    submitMsg();
+  }
+});
+
+$(document).delegate('#msgtext', 'keydown', function(e) {
+  var keyCode = e.keyCode || e.which;
+
+  if (keyCode == 9) {
+    e.preventDefault();
+    var start = $(this).get(0).selectionStart;
+    var end = $(this).get(0).selectionEnd;
+
+    // set textarea value to: text before caret + tab + text after caret
+    $(this).val($(this).val().substring(0, start)
+                + "\t"
+                + $(this).val().substring(end));
+
+    // put caret at right position again
+    $(this).get(0).selectionStart =
+    $(this).get(0).selectionEnd = start + 1;
+  }
+});
+
+function requestLogin(errormsg) {
+  swal({
+    allowOutsideClick: false,
+    showCancelButton: true,
+    cancelButtonText: 'Back',
+    title: '<i>Login</i>',
+    html:
+      "<div style='height:12px'></div>" +
+      "<i>Name</i>" +
+      "<div style='height:10px'></div>" +
+      "<input type='text' class='swalInput' id='loginName'></input>" +
+      "<br></br>" +
+      "<i>Password</i>" +
+      "<div style='height:10px'></div>" +
+      "<input type='password' class='swalInput' id='loginPass'></input>"
+  }).then(function(confirm) {
+    if (confirm) {
+      var name = document.getElementById('loginName').value;
+      var pass = document.getElementById('loginPass').value;
+      if (name.replace(/ /g, '').length !== 0 && pass.replace(/ /g, '').length !== 0) {
+        send('login', { name: name, pass: pass });
+      }
+      else if (name.replace(/ /g, '').length == 0) {
+        setTimeout(function() {
+          requestLogin('Please input a username.');
+        }, 250);
+      }
+      else if (pass.replace(/ /g, '').length == 0) {
+        setTimeout(function() {
+          requestLogin('Please input a password.');
+        }, 250);
+      }
+    }
+    else {
+      requestName();
+    }
+  });
+  document.getElementById('loginName').focus();
+  if (errormsg !== undefined) {
+    if (errormsg.replace(/ /g, '').length !== 0) {
+      swal.showValidationError(errormsg);
+    }
+  }
+}
+
+function requestAccountCreate(errormsg) {
+  swal({
+    allowOutsideClick: false,
+    cancelButtonText: 'Back',
+    showCancelButton: true,
+    title: '<i>Create an Account</i>',
+    html:
+      "<div style='height:12px'></div>" +
+      "<i>Name</i>" +
+      "<div style='height:10px'></div>" +
+      "<input type='text' class='swalInput' id='createName'></input>" +
+      "<br></br>" +
+      "<i>Password</i>" +
+      "<div style='height:10px'></div>" +
+      "<input type='password' class='swalInput' id='createPass'></input>"
+  }).then(function(confirm) {
+    if (confirm) {
+      var name = document.getElementById('createName').value;
+      var pass = document.getElementById('createPass').value;
+      if (name.replace(/ /g, '').length !== 0 && pass.replace(/ /g, '').length !== 0) {
+        send('createAccount', { name: name, pass: pass });
+      }
+      else if (name.replace(/ /g, '').length == 0) {
+        setTimeout(function() {
+          requestAccountCreate('Please input a username');
+        }, 250);
+      }
+      else if (pass.replace(/ /g, '').length == 0) {
+        setTimeout(function() {
+          requestAccountCreate('Please input a password.');
+        }, 250);
+      }
+    }
+    else {
+      requestName();
+    }
+  });
+  document.getElementById('createName').focus();
+  if (errormsg !== undefined) {
+    if (errormsg.replace(/ /g, '').length !== 0) {
+      swal.showValidationError(errormsg);
+    }
+  }
+}
+
+function requestGuest() {
+  swal({   allowOutsideClick: false,
+    title: "<i>Guest</i>",   
+    text: "What's your name?",   
+    input: 'text', 
+    cancelButtonText: 'Back',
+    showCancelButton: true,
+    closeOnConfirm: false,
+    inputPlaceholder: "",
+    inputAttributes: {
+      'autocapitalize': 'off',
+      'autocorrect': 'off'
+    },
+    inputValue: '',
+    inputValidator: function(value) {
+      return new Promise(function(resolve, reject) {
+        if (value) {
+          resolve();
+        } else {
+          reject('You need to write something!');
+        }
+      });
+    }
+  }).then(function(inputValue) {
+    if (inputValue) {
+      send('setName', inputValue);
+    }
+    else {
+      requestName();
+    }
+  });
+}
+
+function requestName() {
+  swal({
+    showCancelButton: false,
+    showConfirmButton: false,
+    animation: false,
+    allowOutsideClick: false,
+    title: 'Welcome',
+    html:
+      "<div style='height:12px'></div>" +
+      "<input type='button' id='guestButton' value='Enter as Guest' onclick='requestGuest()'></input>" +
+      "<br></br>" +
+      "<input type='button' id='loginButton' value='Login as User' onclick='requestLogin()'></input>" +
+      "<br></br>" +
+      "<input type='button' id='createAccountButton' value='Create an Account' onclick='requestAccountCreate()'></input>"
+  });
+}
+
+function submitMsg() {
+  newMsg(msgtext.value);
+}
+
+var socket = io.connect('/', {
+  forceNew:true, 
+  secure:true,
+});
+
+socket.on('requestName', function() {
+  requestName();
+});
+
+socket.on('requestLogin', function(msg) {
+  requestLogin(msg);
+});
+
+socket.on('requestCreate', function(msg) {
+  requestAccountCreate(msg);
+});
+
+socket.on('userlist', function(u) {
+  $('#sidebar-options').val('users');
+  ul.innerHTML = "";
+  rl.innerHTML = "";
+  createbutton.style.display = 'none';
+  createbutton.style.visibility = 'hidden';
+  for (var i = 0; i < u.length; i++) {
+    addUser(u[i]);
+  }
+});
+
+socket.on('roomlist', function(r) {
+  $('#sidebar-options').val('rooms');
+  ul.innerHTML = "";
+  rl.innerHTML = "";
+  createbutton.style.display = 'inherit';
+  createbutton.style.visibility = 'visible';
+  for (var i = 0; i < r.length; i++) {
+    addRoom(r[i]);
+  }
+});
+
+socket.on('created', function(r) {
+  if (sboption.options[sboption.selectedIndex].value == 'rooms') {
+    addRoom(r);
+  }
+});
+
+socket.on('deleted', function(name, origin) {
+  infoMsg(name + ' by ' + origin + ' was deleted.');
+});
+
+socket.on('joined', function(u) {
+  if (sboption.options[sboption.selectedIndex].value == 'users') {
+    if (u.id == '/#' + socket.id) {
+      infoMsg('You joined ' + u.location);
+      roomtitle.innerHTML = u.location;
+    }
+    else {
+      infoMsg(u.auth + ' joined ' + u.location);
+    }
+    addUser(u);
+  }
+});
+
+socket.on('left', function(id, kicked, kickedfrom, fromDelete) {
+  deleteUser(id, kicked, kickedfrom, fromDelete);
+});
+
+socket.on('alert', function(title, body, type, dur) {
+  swalAlert(title, body, type, dur);
+});
+
+socket.on('inputError', function(content) {
+    swal.showValidationError(content);
+});
+
+socket.on('success', function() {
+  //msgtext.value = "";
+});
+
+socket.on('succesEnter', function() {
+  swal.close();
+  $('#msgtext').focus();
+});
+
+var lastid = "";
+socket.on('messaged', function(what) {
+  what.content = stripScripts(what.content);
+  if (what.content.length !== 0) {
+    var msg;
+    var bubbles = [];
+    var sections = ml.children;
+    for (var i = 0; i < sections.length; i++) {
+      if (sections[i].className == 'pink bubble you' || sections[i].className == 'blue bubble me' || sections[i].className == 'white bubble you' || sections[i].className == 'pink bubble you' || sections[i].className == 'info red') {
+        bubbles.push(sections[i]);
+      }
+    }
+    if (lastid !== what.id || bubbles[bubbles.length - 1].className == 'info red' || what.type == 'whisper') {
+      var extra = document.createElement("DIV");
+      extra.className = 'divider';
+      ml.appendChild(extra);
+      if (what.id == '/#' + socket.id) {
+        msg = document.createElement("DIV");
+        if (what.type == 'whisper') {
+          var user = document.createElement("DIV");
+          user.className = 'name me';
+          var text = document.createTextNode('To ' + what.who);
+          user.appendChild(text);
+          user.title = what.auth;
+          $(user).toggle();
+          $(user).fadeIn(75, function(err) {
+            if (err) console.log(err);
+          });
+          ml.appendChild(user);
+          msg.className = 'pink bubble me';
+        }
+        else {
+          msg.className = 'blue bubble me';
+        }
+        msg.innerHTML = what.content;
+        ml.appendChild(msg);
+        $(msg).toggle();
+        $(msg).stop(true, true).fadeIn({ duration: 450, queue: false }).css('display', 'none').slideDown(150);
+      }
+      
+      else {
+        var user = document.createElement("DIV");
+        if (what.stat == 'admin') {
+          user.className = 'name you green';
+        }
+        else {
+          user.className = 'name you';
+        }
+        var text = document.createTextNode(what.who); 
+        user.appendChild(text);
+        user.title = what.auth;
+        ml.appendChild(user);
+        
+        msg = document.createElement("DIV");
+        if (what.type == 'whisper') {
+          msg.className = 'pink bubble you';
+        }
+        else {
+          msg.className = 'white bubble you';
+        }
+        var text = document.createTextNode(what.content); 
+        msg.appendChild(text);
+        ml.appendChild(msg);
+        $(user).toggle();
+        $(user).fadeIn(75, function(err) {
+          if (err) console.log(err);
+        });
+        $(msg).toggle();
+        $(msg).stop(true, true).fadeIn({ duration: 450, queue: false }).css('display', 'none').slideDown(150);    
+      }
+      
+      var extra = document.createElement("DIV");
+      extra.className = 'divider';
+      ml.appendChild(extra);
+      if (document.activeElement.id !== 'messages' && document.activeElement.id !== '' && document.activeElement.id !== undefined) {
+        ml.scrollTop = ml.scrollHeight;
+      }
+    }
+    else if (lastid == what.id) {
+      bubbles[bubbles.length - 1].innerHTML += '<div style="height:5px"></div>' +  what.content;
+      if (document.activeElement.id !== 'messages' && document.activeElement.id !== '' && document.activeElement.id !== undefined) {
+        ml.scrollTop = ml.scrollHeight;
+      }
+    }
+    lastid = what.id;
+  }
+});
+
+function infoMsg(content) {
+    var extra = document.createElement("DIV");
+    extra.className = 'divider';
+    ml.appendChild(extra);
+    var msg = document.createElement("I");
+    msg.className = 'info red';
+    var text = document.createTextNode(content); 
+    msg.appendChild(text);
+    ml.appendChild(msg);
+    var extra = document.createElement("DIV");
+    extra.className = 'divider';
+    ml.appendChild(extra);
+    $(msg).toggle();
+      $(msg).stop(true, true).fadeIn({ duration: 450, queue: false }).css('display', 'none').slideDown(150);
+    if (document.activeElement.id !== 'messages' && document.activeElement.id !== '' && document.activeElement.id !== undefined) {
+      ml.scrollTop = ml.scrollHeight;
+    }
+}
+
+function addUser(stuff) {
+  var user = document.createElement("BUTTON");
+  if (stuff.stat == 'admin') {
+    user.className = 'userbutton green';
+  }
+  else {
+    user.className = 'userbutton';
+  }
+  user.innerHTML = stuff.auth;
+  user.id = stuff.id;
+  user.onclick = function() {
+    if (user.id !== '/#' + socket.id) {
+      msgtext.value = "/whisper " + stuff.auth + ' ' + msgtext.value;
+      //msgtext.setSelectionRange(0, ("/whisper " + stuff.auth).length + 1);
+      msgtext.focus();
+    }
+  }
+  ul.appendChild(user);
+  $(user).toggle();
+  $(user).stop(true, true).fadeIn({ duration: 500, queue: false }).css('display', 'none').slideDown(150);    
+  users.push({id: stuff.id, info: stuff, button: user});
+}
+
+function addRoom(stuff) {
+  var room = document.createElement("BUTTON");
+  room.className = 'roombutton';
+  if (stuff.originAuth == 'none') {
+    if (stuff.name == roomtitle.innerHTML) {
+      room.innerHTML = '✓ ' + stuff.name;
+    }
+    else {
+      room.innerHTML = stuff.name;
+    }
+  }
+  else {
+      if (stuff.name == roomtitle.innerHTML) {
+        room.innerHTML = '✓ ' + stuff.name + ' by ' + stuff.originAuth;
+      }
+      else {
+        room.innerHTML = stuff.name + ' by ' + stuff.originAuth;
+      }
+  }
+  room.id = stuff.id;
+  room.onclick = function() {
+    if (stuff.locked) {
+      swal({   title: "Wait!",   
+        text: "What's the password?",
+        input: "password",   
+        animation: "slide-from-top",  
+        showCancelButton:true,
+        inputPlaceholder: "", 
+        input: 'password',
+        inputAttributes: {
+          'autocapitalize': 'off',
+          'autocorrect': 'off'
+        },
+        inputValidator: function(value) {
+          return new Promise(function(resolve, reject) {
+            if (value) {
+              resolve();
+            } else {
+              reject('You need to write something!');
+            }
+          });
+        }
+      }).then(function(inputValue) {
+          joinRoom(stuff.id, inputValue);
+      });
+    }
+    else {
+      joinRoom(stuff.id, '');
+    }
+  }
+  rl.appendChild(room);
+  $(room).toggle();
+  $(room).stop(true, true).fadeIn({ duration: 500, queue: false }).css('display', 'none').slideDown(150);    
+  rooms.push({id: stuff.id, info: stuff, button: room});
+}
+
+function deleteUser(id, kicked, fromWhere, fromDelete) {
+  var i = aoIndex(users, id, 'id');
+  if (i !== -1) {
+    if (fromDelete) {
+      
+    }
+    else {
+      if (kicked) {
+        if (users[i].info.id == '/#' + socket.id) {
+          infoMsg('You were kicked from ' + fromWhere);
+        }
+        else {
+          infoMsg(users[i].info.auth + ' was kicked from ' + users[i].info.location);
+        }
+      }
+      else {
+        if (users[i].info.id == '/#' + socket.id) {
+          //infoMsg('You left ' + users[i].info.location);
+        }
+        else {
+          infoMsg(users[i].info.auth + ' left ' + users[i].info.location);
+        }
+      }
+    }
+    if (sboption.options[sboption.selectedIndex].value == 'users') {
+      send('getUsers', "");
+    }
+    users.splice(i);
+  }
+}
+
+function deleteRoom(id) {
+  var i = aoIndex(rooms, id, 'id');
+  if (i !== -1) {
+    if (sboption.options[sboption.selectedIndex].value == 'rooms') {
+      send('getRooms', "");
+    }
+    rooms.splice(i);
+  }
+}
+
+function send(type, stuff) {
+  socket.emit(type, stuff);
+}
+
+function newMsg(content) {
+  send('message', content);
+  msgtext.value = "";
+  msgtext.focus();
+}
+
+function joinRoom(name, pass) {
+  send('join', {name: name, password: pass})
+}
+
+function createClick() {
+  swal({   title: "First",   
+    text: "What will its name be?",
+    input: "text",   
+    animation: "slide-from-top",   
+    showCancelButton: true,
+    inputPlaceholder: "",
+    inputAttributes: {
+      'autocapitalize': 'off',
+      'autocorrect': 'off'
+    },
+    inputValue: '',
+    inputValidator: function(value) {
+      return new Promise(function(resolve, reject) {
+        if (value) {
+          resolve();
+        } else {
+          reject('You need to write something!');
+        }
+      });
+    }
+  }).then(function(inputValue) {
+    if (inputValue) {
+      setTimeout(function() {
+      swal({   title: "Second",   
+        text: "What will its password be? (leave blank for no password)",
+        input: "password",   
+        showCancelButton: true,
+        animation: "slide-from-top",
+        inputPlaceholder: "",
+        inputAttributes: {
+          'autocapitalize': 'off',
+          'autocorrect': 'off'
+        },
+        inputValue: '',
+        inputValidator: function(value) {
+          return new Promise(function(resolve, reject) {
+            resolve();
+          });
+        }
+      }).then(function(inputValue2) {
+        createRoom(inputValue, inputValue2);
+      });
+      }, 300);
+    }
+  });
+}
+
+function createRoom(name, pass) {
+  send('create', {name: name, password: pass});
+}
+
+var alertime;
+function swalAlert(title, body, type, dur) {
+  clearTimeout(alertime);
+  alertime = setTimeout(function() {
+  if (dur == "forever") {
+    swal({   
+      title: title,   
+      text: body,
+      allowOutsideClick: true,
+      type: type,
+      timer: 1500,   
+      showConfirmButton: false 
+    });
+  }
+  else {
+    swal({   
+      title: title,   
+      text: body,
+      allowOutsideClick: true,
+      type: type,
+      timer: dur,   
+      showConfirmButton: false 
+    });
+  }
+  }, 300);
+}
+
+function stripScripts(s) {
+  var div = document.createElement('div');
+  div.innerHTML = s;
+  var scripts = div.getElementsByTagName('script');
+  var i = scripts.length;
+  while (i--) {
+    scripts[i].parentNode.removeChild(scripts[i]);
+  }
+  return div.innerHTML;
+}
+
+function aoIndex(a, t, p) {
+  for (var i = 0, len = a.length; i < len; i++) {
+      if (a[i][p] === t) return i;
+  }
+  return -1;
+}
+
+function readCookie(name) {
+    var nameEQ = name + "=";
+    var ca = document.cookie.split(';');
+    for(var i=0;i < ca.length;i++) {
+        var c = ca[i];
+        while (c.charAt(0)==' ') c = c.substring(1,c.length);
+        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+    }
+    return null;
+}
+
+function round(num, places) {
+    return Math.ceil(num * 100) / 100;
+}
+      
+</script>
+  
+</body>
+</html>
